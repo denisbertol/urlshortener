@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Encurtador de URL"
+    />
+    <title>Encurtador de URL</title>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <style>
+    .w3-theme {color:#fff !important;background-color:#4CAF50 !important}
+    .w3-btn {background-color:#4CAF50;margin-bottom:4px}
+    .w3-code{border-left:4px solid #4CAF50}
+    .myMenu {margin-bottom:150px}
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/16.13.1/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/16.13.1/umd/react-dom.production.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+      function encurtar(){
+
+        var createCORSRequest = function(method, url) {
+          var xhr = new XMLHttpRequest();
+          if ("withCredentials" in xhr) {
+            // Most browsers.
+            xhr.open(method, url, true);
+          } else if (typeof XDomainRequest != "undefined") {
+            // IE8 & IE9
+            xhr = new XDomainRequest();
+            xhr.open(method, url);
+          } else {
+            // CORS not supported.
+            xhr = null;
+          }
+          return xhr;
+        };
+
+        var url = 'https://4cm63kc16h.execute-api.us-east-1.amazonaws.com/dev/admin/shorturls';
+        var method = 'POST';
+        var xhr = createCORSRequest(method, url);
+
+        xhr.addEventListener("readystatechange", function() {
+          if(this.readyState === 4) {
+            $("#url_encurtada").show(100);
+            $( "#url" ).html( "<input id=\"shortUrlText\" type=\"text\" class=\"w3-input\" value=\"" + JSON.parse(this.responseText).shortUrl + "\" readonly/>");
+          }
+        });
+
+        var fullUrl = document.getElementById("fullUrlText").value;
+
+        var data = JSON.stringify({ "fullUrl": fullUrl });
+
+        xhr.send(data);
+    }
+
+    function copy() {
+        /* Get the text field */
+        var copyText = document.getElementById("shortUrlText");
+
+        /* Select the text field */
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); /* For mobile devices */
+
+        /* Copy the text inside the text field */
+        navigator.clipboard.writeText(copyText.value);
+
+        /* Alert the copied text */
+        $( "#mensagemCopiada" ).html( "<font color=\"red\">     URL Copiada     </font>");
+        }
+    </script>
+  </head>
+  <body>
+    <div id="root">
+        <div class="w3-main w3-container">
+            <h1 class="w3-jumbo">Encurtador de URL</h1>
+    
+            <div class="w3-panel w3-padding-large w3-card-4 w3-light-grey">
+            <p class="w3-xlarge">Entre com a URL Completa:</p>
+            <p class="w3-large"></p>
+            <p><input id="fullUrlText" class="w3-input" type="text" required/></p>
+            <p></p>
+            <button class="w3-button w3-theme w3-hover-white" onclick="encurtar()">Encurtar</button>
+            </div>
+            <div id = "url_encurtada" class="w3-main w3-container" hidden>          
+                <div class="w3-panel w3-padding-large w3-card-4 w3-light-grey">
+                  <p class="w3-xlarge">URL Encurtada:</p>
+                  <p id="w3-large"><div id="url"></div><p><button class="w3-button w3-theme w3-hover-white" onclick="copy()">Copiar</button><div id="mensagemCopiada"></div></p>
+                  <p></p>
+                </div>
+              </div>
+        </div> 
+    </div>
+  </body>
+</html>

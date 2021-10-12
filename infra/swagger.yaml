@@ -1,0 +1,64 @@
+swagger: '2.0'
+info:
+  description: Your first API with Amazon API Gateway. This is a sample API that integrates via HTTP with our demo Url Shortener endpoints
+  title: UrlShortener
+  version: 1.0.0
+schemes:
+  - https
+paths:
+  /admin/shorturls:
+    post:
+      tags:
+        - shorturls
+      operationId: CreateShortUrl
+      summary: Create a Short Url
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: NewShortUrl
+          required: true
+          schema:
+            $ref: '#/definitions/NewShortUrl'
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            $ref: '#/definitions/NewShortUrlResponse'
+definitions:
+  NewShortUrlResponse:
+    type: string
+    $ref: '#/definitions/ShortUrlType'
+  Url:
+    type: object
+    properties:
+      fullUrl:
+        type: string
+  ShortUrl:
+    type: object
+    properties:
+      fullUrl:
+        type: string        
+      shortUrl:
+        type: string        
+  NewShortUrl:
+    type: object
+    properties:
+      fullUrl:
+        $ref: '#/definitions/UrlType'
+  UrlType:
+    type: string
+    enum:
+      - https://www.uol.com.br
+  ShortUrlType:
+    properties:
+      fullUrl:
+        type: string        
+        enum:
+          - https://www.uol.com.br
+      shortUrl:
+        type: string      
+        enum:
+          - https://d19p6s9zu1haz9.cloudfront.net/e77dd5a3
