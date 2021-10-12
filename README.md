@@ -17,13 +17,13 @@ Optei por escolher uma arquitetura serverless, com a vantagem de não precisar p
 
 Segue o Desenho inicial da solução:
 
-[general]: https://raw.githubusercontent.com/denisbertol/urlshortener/main/infra/images/highLevelArch.jpg "Arquitetura Geral"
+![general] (./infra/images/highLevelArch.jpg) "Arquitetura Geral"
 
-[admin_flow]: https://raw.githubusercontent.com/denisbertol/urlshortener/main/infra/images/adminFlow.jpg  "Fluxo da criação da url encurtada"
+![admin_flow]: (./infra/images/adminFlow.jpg)  "Fluxo da criação da url encurtada"
 
-[apiCall]: https://raw.githubusercontent.com/denisbertol/urlshortener/main/infra/images/adminAPICall.jpg  "Chamada de API de criação"
+![apiCall]: (./infra/images/adminAPICall.jpg)  "Chamada de API de criação"
 
-[geturl]: https://raw.githubusercontent.com/denisbertol/urlshortener/main/infra/images/getUrl.jpg  "Obter e redirecionar url"
+![geturl]: (./infra/images/getUrl.jpg)  "Obter e redirecionar url"
 
 # <a name="team-members"></a>Membros do time
 * "Denis Bertoluci" <denisbertol@gmail.com>
