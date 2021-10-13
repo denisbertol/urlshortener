@@ -1,5 +1,5 @@
 # URL Shortener
-Projeto encurtador de urls
+Projeto encurtador de urls privado.
 
 
 # Conteúdo
