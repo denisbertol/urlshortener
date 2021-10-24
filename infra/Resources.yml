@@ -1,0 +1,386 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ""
+Resources:
+    LambdaFunction:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: ""
+            FunctionName: "urlshortener"
+            Handler: "index.lambda_handler"
+            Architectures: 
+              - "x86_64"
+            Code: 
+                ZipFile: |
+                  import uuid
+                  import logging
+
+                  import boto3
+
+                  LOG = logging.getLogger()
+                  LOG.setLevel(logging.INFO)
+                        
+                  def lambda_handler(event, context):
+                      # Parse targetUrl
+                      fullUrl = event['fullUrl']
+
+                      ssm = boto3.client('ssm')
+
+                      parameter = ssm.get_parameter(Name='/app/prod/urlshortener/baseUrl', WithDecryption=True)
+
+                      baseUrl = parameter ['Parameter']['Value']
+
+                      # Create a unique id (take first 8 chars)
+                      id = str(uuid.uuid4())[0:8]
+
+                      client = boto3.client('dynamodb')
+                      data = client.put_item(
+                      TableName='tb_urls',
+                      Item={
+                        'urlcurta': {
+                          'S': '' + str(id)
+                        },
+                        'urlcompleta': {
+                          'S': '' + str(fullUrl)
+                        }
+                      }
+                    )
+                      # Create the redirect URL
+                      url = baseUrl + id
+
+                      return {
+                          'shortUrl': '%s' % url,'fullUrl': '%s' % fullUrl
+                      }
+            MemorySize: 128
+            Role: !GetAtt IAMRole.Arn
+            Runtime: "python3.8"
+            Timeout: 3
+            TracingConfig: 
+                Mode: "PassThrough"
+
+    DynamoDBTable:
+        Type: "AWS::DynamoDB::Table"
+        Properties:
+            AttributeDefinitions: 
+              - 
+                AttributeName: "urlcompleta"
+                AttributeType: "S"
+              - 
+                AttributeName: "urlcurta"
+                AttributeType: "S"
+            TableName: "tb_urls"
+            KeySchema: 
+              - 
+                AttributeName: "urlcurta"
+                KeyType: "HASH"
+              - 
+                AttributeName: "urlcompleta"
+                KeyType: "RANGE"
+            ProvisionedThroughput: 
+                ReadCapacityUnits: 1
+                WriteCapacityUnits: 1
+
+    ApiGatewayRestApi:
+        Type: "AWS::ApiGateway::RestApi"
+        Properties:
+            Name: !Sub "UrlShortener"
+            Description: !Sub "Your first API with Amazon API Gateway. This is a sample API that integrates via HTTP with our demo Url Shortener endpoints"
+            ApiKeySourceType: "HEADER"
+            EndpointConfiguration: 
+                Types: 
+                  - "PRIVATE"
+            Policy: !Sub |
+                    {
+                      "Version": "2012-10-17",
+                      "Statement": [
+                        {
+                          "Effect": "Allow",
+                          "Principal": "*",
+                          "Action": "execute-api:Invoke",
+                          "Resource": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/*/*"
+                        }
+                      ]
+                    }                  
+
+    ApiGatewayStage:
+        Type: "AWS::ApiGateway::Stage"
+        Properties:
+            StageName: "dev"
+            DeploymentId: !Ref ApiGatewayDeployment
+            RestApiId: !Ref ApiGatewayRestApi
+            CacheClusterEnabled: false
+            CacheClusterSize: "0.5"
+            MethodSettings: 
+              - 
+                CacheDataEncrypted: false
+                CacheTtlInSeconds: 300
+                CachingEnabled: false
+                DataTraceEnabled: false
+                HttpMethod: "POST"
+                MetricsEnabled: false
+                ResourcePath: "/shorturls"
+                ThrottlingBurstLimit: 5000
+                ThrottlingRateLimit: 10000                
+            TracingEnabled: false
+
+    ApiGatewayDeployment:        
+        Type: "AWS::ApiGateway::Deployment"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+        DependsOn: [ApiGatewayMethod,ApiGatewayMethod2]
+
+    ApiGatewayResource:
+        Type: "AWS::ApiGateway::Resource"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            PathPart: "admin"
+            ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+
+    ApiGatewayResource2:
+        Type: "AWS::ApiGateway::Resource"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            PathPart: "shorturls"
+            ParentId: !Ref ApiGatewayResource
+
+    ApiGatewayMethod:
+        Type: "AWS::ApiGateway::Method"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            ResourceId: !Ref ApiGatewayResource2
+            HttpMethod: "POST"
+            AuthorizationType: "NONE"
+            ApiKeyRequired: false
+            OperationName: !Sub "CreateUrl"
+            RequestModels: 
+                "application/json": !Ref ApiGatewayModel
+            MethodResponses: 
+              - 
+                ResponseModels: 
+                    "application/json": !Sub "${ApiGatewayModel}Response"
+                ResponseParameters: 
+                    "method.response.header.Access-Control-Allow-Headers": false
+                    "method.response.header.Access-Control-Allow-Methods": false
+                    "method.response.header.Access-Control-Allow-Origin": false
+                    "method.response.header.X-Requested-With": false
+                StatusCode: "200"
+            Integration: 
+                CacheNamespace: !Ref ApiGatewayResource2
+                ContentHandling: "CONVERT_TO_TEXT"
+                IntegrationHttpMethod: "POST"
+                IntegrationResponses: 
+                  - 
+                    ResponseParameters: 
+                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with'"
+                        "method.response.header.Access-Control-Allow-Methods": "'POST,GET,OPTIONS'"
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                        "method.response.header.X-Requested-With": "'*'"
+                    ResponseTemplates: {}
+                    SelectionPattern: ""
+                    StatusCode: "200"
+                PassthroughBehavior: "WHEN_NO_MATCH"
+                TimeoutInMillis: 29000
+                Type: "AWS"
+                Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}/invocations"         
+
+    ApiGatewayModel:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: !Sub "New${ApiGatewayModel2}"
+            Schema: !Sub |
+                {
+                  "type" : "object",
+                  "properties" : {
+                    "full${ApiGatewayModel6}" : {
+                      "$ref":"https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/${ApiGatewayModel4}"
+                    }
+                  }
+                }
+            ContentType: "application/json"
+
+    ApiGatewayModel2:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: !Sub "Short${ApiGatewayModel6}"
+            Schema: !Sub |
+                {
+                  "type" : "object",
+                  "properties" : {
+                    "full${ApiGatewayModel6}" : {
+                      "type" : "string"
+                    },
+                    "short${ApiGatewayModel6}" : {
+                      "type" : "string"
+                    }
+                  }
+                }
+            ContentType: "application/json"
+
+    ApiGatewayModel3:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: !Sub "${ApiGatewayModel2}Type"
+            Schema: !Sub |
+                {
+                  "properties" : {
+                    "full${ApiGatewayModel6}" : {
+                      "type" : "string",
+                      "enum" : [ "https://www.uol.com.br" ]
+                    },
+                    "short${ApiGatewayModel6}" : {
+                      "type" : "string",
+                      "enum" : [ "https://xxxxxx.net/${LambdaFunction}/e77dd5a3" ]
+                    }
+                  }
+                }
+            ContentType: "application/json"
+
+    ApiGatewayModel4:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: !Sub "${ApiGatewayModel6}Type"
+            Schema: |
+                {
+                  "type" : "string",
+                  "enum" : [ "https://www.uol.com.br" ]
+                }
+            ContentType: "application/json"
+
+    ApiGatewayModel5:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: !Sub "${ApiGatewayModel}Response"
+            Schema: !Sub |
+                {
+                  "$ref":"https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/${ApiGatewayModel2}Type"
+                }
+            ContentType: "application/json"
+
+    ApiGatewayModel6:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: "Url"
+            Schema: |
+                {
+                  "type" : "object",
+                  "properties" : {
+                    "fullUrl" : {
+                      "type" : "string"
+                    }
+                  }
+                }
+            ContentType: "application/json"              
+
+    ApiGatewayMethod2:
+        Type: "AWS::ApiGateway::Method"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            ResourceId: !Ref ApiGatewayResource2
+            HttpMethod: "OPTIONS"
+            AuthorizationType: "NONE"
+            ApiKeyRequired: false
+            RequestParameters: {}
+            Integration: 
+                CacheNamespace: !Ref ApiGatewayResource2
+                IntegrationResponses: 
+                  - 
+                    ResponseTemplates: {}
+                    StatusCode: "200"
+                PassthroughBehavior: "WHEN_NO_MATCH"
+                RequestTemplates: 
+                    "application/json": "{\"statusCode\": 200}"
+                TimeoutInMillis: 29000
+                Type: "MOCK"
+            
+    LogsLogGroup:
+        Type: "AWS::Logs::LogGroup"
+        Properties:
+            LogGroupName: !Sub "/aws/lambda/${LambdaFunction}"
+
+    IAMRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "urlshortener-role-5g7murpk"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSLambdaBasicExecutionRole-8ec118fc-531e-48d7-9176-a64c3034bc6d"
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/ReadParameterUrlShortener"
+
+    APIInvokePermission:
+        Type: AWS::Lambda::Permission
+        Properties:
+            FunctionName: !GetAtt LambdaFunction.Arn
+            Action: lambda:InvokeFunction
+            Principal: apigateway.amazonaws.com
+            SourceAccount: !Ref 'AWS::AccountId'
+            SourceArn: !Join ["", 
+                                [
+                                  "arn:aws:execute-api:", 
+                                  {"Ref": "AWS::Region"}, ":", 
+                                  {"Ref": "AWS::AccountId"}, ":", 
+                                  {"Ref": "ApiGatewayRestApi"}, "/*/POST/admin/shorturls"
+                                ]
+                            ]      
+
+# Criar o SSM
+
+
+#    CloudFrontDistribution:
+#        Type: "AWS::CloudFront::Distribution"
+#        Properties:
+#            DistributionConfig: 
+#                Origins: 
+#                  - 
+#                    ConnectionAttempts: 3
+#                    ConnectionTimeout: 10
+#                    DomainName: !Sub "${LambdaFunction}ccee.s3.${AWS::Region}.amazonaws.com"
+#                    Id: !Sub "${LambdaFunction}ccee.s3.${AWS::Region}.amazonaws.com"
+#                    OriginPath: ""
+#                    S3OriginConfig: 
+#                        OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontCloudFrontOriginAccessIdentity}"
+#                OriginGroups: 
+#                    Quantity: 0
+#                DefaultCacheBehavior: 
+#                    AllowedMethods: 
+#                      - "HEAD"
+#                      - "DELETE"
+#                      - "POST"
+#                      - "GET"
+#                      - "OPTIONS"
+#                      - "PUT"
+#                      - "PATCH"
+#                    CachedMethods: 
+#                      - "HEAD"
+#                      - "GET"
+#                    Compress: true
+#                    CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6"
+#                    SmoothStreaming: false
+#                    TargetOriginId: !Sub "${LambdaFunction}ccee.s3.${AWS::Region}.amazonaws.com"
+#                    ViewerProtocolPolicy: "redirect-to-https"
+#                Comment: ""
+ #               PriceClass: "PriceClass_All"
+ #               Enabled: true
+ #               ViewerCertificate: 
+ #                   CloudFrontDefaultCertificate: true
+ #                   MinimumProtocolVersion: "TLSv1"
+ #               Restrictions: 
+ #                   GeoRestriction: 
+ #                       RestrictionType: "none"
+ #               HttpVersion: "http2"
+ #               DefaultRootObject: "index.html"
+ #               IPV6Enabled: true
+
+#    CloudFrontCloudFrontOriginAccessIdentity:
+#        Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+#        Properties:
+#            CloudFrontOriginAccessIdentityConfig: 
+#                Comment: !Sub "access-identity-${LambdaFunction}ccee.s3.${AWS::Region}.amazonaws.com"              
+
