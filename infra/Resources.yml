@@ -341,8 +341,8 @@ Resources:
 #                  - 
 #                    ConnectionAttempts: 3
 #                    ConnectionTimeout: 10
-#                    DomainName: !Sub "${LambdaFunction}ccee.s3.${AWS::Region}.amazonaws.com"
-#                    Id: !Sub "${LambdaFunction}ccee.s3.${AWS::Region}.amazonaws.com"
+#                    DomainName: !Sub "${LambdaFunction}xpto.s3.${AWS::Region}.amazonaws.com"
+#                    Id: !Sub "${LambdaFunction}xpto.s3.${AWS::Region}.amazonaws.com"
 #                    OriginPath: ""
 #                    S3OriginConfig: 
 #                        OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontCloudFrontOriginAccessIdentity}"
@@ -363,7 +363,7 @@ Resources:
 #                    Compress: true
 #                    CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6"
 #                    SmoothStreaming: false
-#                    TargetOriginId: !Sub "${LambdaFunction}ccee.s3.${AWS::Region}.amazonaws.com"
+#                    TargetOriginId: !Sub "${LambdaFunction}xpto.s3.${AWS::Region}.amazonaws.com"
 #                    ViewerProtocolPolicy: "redirect-to-https"
 #                Comment: ""
  #               PriceClass: "PriceClass_All"
@@ -382,5 +382,5 @@ Resources:
 #        Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
 #        Properties:
 #            CloudFrontOriginAccessIdentityConfig: 
-#                Comment: !Sub "access-identity-${LambdaFunction}ccee.s3.${AWS::Region}.amazonaws.com"              
+#                Comment: !Sub "access-identity-${LambdaFunction}xpto.s3.${AWS::Region}.amazonaws.com"              
 
